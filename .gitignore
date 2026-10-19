@@ -1,0 +1,7 @@
+# Sách nguồn (file lớn, có bản quyền) — không đưa lên Git
+*.pdf
+tai-lieu/
+# Tệp hệ thống
+.DS_Store
+Thumbs.db
+desktop.ini
