@@ -640,14 +640,20 @@
   CMR.khoiDong = function () {
     ganGiaoDien();
     const ds = window.DANH_MUC || [];
-    let i = 0;
+    // Tải song song mọi file cùng lúc (nhanh hơn nhiều khi chạy trên mạng);
+    // async = false giữ đúng thứ tự chạy như trong danh mục.
+    let conLai = ds.length;
     const tiep = () => {
-      if (i >= ds.length) return xong();
-      const s = document.createElement("script");
-      s.src = "noi-dung/" + ds[i++];
-      s.onload = tiep;
-      s.onerror = () => { CMR.loiTai.push(s.src); tiep(); };
-      document.body.appendChild(s);
+      if (!conLai) return xong();
+      ds.forEach((f) => {
+        const s = document.createElement("script");
+        s.src = "noi-dung/" + f;
+        s.async = false;
+        const het = () => { if (--conLai === 0) xong(); };
+        s.onload = het;
+        s.onerror = () => { CMR.loiTai.push(s.src); het(); };
+        document.body.appendChild(s);
+      });
     };
     const xong = () => {
       taoChiMuc(); ganTimKiem();
