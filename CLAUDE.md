@@ -2,6 +2,8 @@
 
 Hướng dẫn cho Claude Code khi làm việc trong thư mục này. Đọc hết file này trước khi sửa.
 
+> **Bắt đầu phiên mới:** đọc thêm `TIEP-TUC.md` — tiến độ, các quyết định đã chốt và danh sách việc người dùng muốn sửa tiếp.
+
 ## Người dùng và cách làm việc
 - Chủ dự án là bác sĩ, **mới bắt đầu học code**. Họ ra yêu cầu bằng tiếng Việt; Claude tự sửa file, không bắt họ viết code.
 - Sau mỗi thay đổi: chạy `node cong-cu-noi-bo/kiem-tra.js` (nếu máy có Node.js) và báo lại ngắn gọn bằng tiếng Việt: đã sửa gì, ở file nào, mở trang nào để xem.
@@ -16,7 +18,7 @@ Hướng dẫn cho Claude Code khi làm việc trong thư mục này. Đọc h�
 
 ## Cấu trúc thư mục
 ```
-index.html                 trang web (không cần sửa)
+index.html                 khung trang + menu thanh bên (sửa ở đây nếu muốn thêm/bớt mục menu)
 assets/app.js              chương trình: điều hướng, tìm kiếm, công cụ (hiếm khi sửa)
 assets/style.css           giao diện; màu nằm ở đầu file (:root)
 noi-dung/danh-muc.js       DANH SÁCH FILE NỘI DUNG — web chỉ tải file có tên ở đây
@@ -93,6 +95,8 @@ CMR.benh({
 
 Mục “Hình ảnh minh họa” và “Tài liệu tham khảo” do web tự tạo từ `hinh` và `nguon`. Mục nào sách không có thì bỏ, không viết cho đủ.
 
+**Trang bệnh chia 2 tab** (tự động, không cần khai báo): các mục bắt đầu bằng *Tổng quan*, *Đặc điểm lâm sàng*, *Chỉ định*, *Protocol* nằm ở tab **1 · Trước chụp**; mọi mục còn lại (Hình ảnh MRI, Tiêu chuẩn, Phân biệt, Tiên lượng, Bẫy, Mẫu kết luận, Hình minh họa) nằm ở tab **2 · Đọc phim**. Vì vậy giữ đúng tên mục như trên. Khi in, cả 2 tab đều được in.
+
 ### Quy tắc Markdown trong `noiDung`
 - Đặt trong dấu backtick `` ` `` → **không dùng dấu backtick bên trong nội dung**; không viết `${`.
 - Liên kết nội bộ: `#/benh/<id>`, `#/protocol/P5`, `#/xung/lge`, `#/tham-khao/kieu-lge`, `#/cong-cu/may-tinh`.
@@ -104,6 +108,13 @@ LGE: `lge-khong`, `lge-duoi-noi-mac`, `lge-xuyen-thanh`, `lge-giua-thanh`, `lge-
 Mapping: `t2-tang`, `t1-tang`, `t1-giam`, `ecv-tang`, `ecv-giam`, `t2star-giam`, `mo`, `mvo`.
 Hình thái: `day-that-trai`, `gian-that-trai`, `giam-ef`, `rlvd-vung`, `phinh-mom`, `gian-that-phai`, `rlvd-that-phai`, `nhi-gian`, `be-co`, `sam`, `tran-dich-mnt`, `mnt-day`, `vach-nay`, `khoi`, `huyet-khoi`, `shunt`, `gian-dmc`.
 Muốn thêm mã mới: thêm vào mảng `DAU_HIEU` đầu file `assets/app.js`.
+
+## Giao diện (sau lần sắp xếp lại 21/10/2026)
+- Menu thanh bên trái theo luồng làm việc: **1 Trước chụp** (Chọn protocol theo chỉ định, Danh sách protocol) → **2 Đọc phim** (Danh mục bệnh, Tra ngược, So sánh) → **Tham khảo** (Giá trị bình thường, Kiểu LGE, Máy tính, Chuỗi xung…). Trên điện thoại menu thu vào nút ☰.
+- Danh mục bệnh và danh sách protocol hiển thị **mỗi mục một dòng** (người dùng yêu cầu), có ô lọc nhanh và chip lọc theo nhóm.
+- So sánh bệnh là **bảng: cùng mục cùng hàng**; ở hàng Protocol các xung chung được làm mờ, dòng "Khác:" liệt kê xung riêng.
+- Máy tính: chọn phép tính ở cột trái, chỉ hiện phép tính đang chọn.
+- Mục lục trong bài là **thanh ngang** dính trên đầu khi cuộn (tự tạo từ các tiêu đề `## `).
 
 ## Protocol và chuỗi xung
 - Protocol `noi-dung/protocol/P<n>.js`: `ma`, `ten`, `chiDinhNgan`, `thoiGian`, `tuKhoa`, `buoc`, `noiDung`.

@@ -111,13 +111,13 @@
   }
 
   /* ---------- Thanh chụp ---------- */
-  function thanhChup(ds, chuThich = true) {
+  function thanhChup(ds, chuThich = true, mo = null) {
     if (!ds || !ds.length) return "";
     const loaiDung = new Set();
     const khoi = ds.map(buoc).map((b) => {
       const x = CMR.xungDS[b.x] || { ten: b.x, ngan: b.x, loai: "giaiphau" };
       loaiDung.add(x.loai);
-      return `<a class="blk c-${x.loai}${b.tuyChon ? " opt" : ""}" href="#/xung/${esc(b.x)}" title="${esc(x.ten + (b.ghi ? " — " + b.ghi : "") + (b.tuyChon ? " (tùy chọn)" : ""))}">` +
+      return `<a class="blk c-${x.loai}${b.tuyChon ? " opt" : ""}${mo && mo.has(b.x) ? " dim" : ""}" href="#/xung/${esc(b.x)}" title="${esc(x.ten + (b.ghi ? " — " + b.ghi : "") + (b.tuyChon ? " (tùy chọn)" : ""))}">` +
         (b.gd ? `<span class="gd">${esc(b.gd === true ? "Tiêm Gd" : b.gd)}</span>` : "") +
         `${esc(x.ngan || x.ten)}${b.ghi ? `<small>${esc(b.ghi)}</small>` : ""}</a>`;
     }).join("");
@@ -218,48 +218,96 @@
   const crumbs = (ds) => `<div class="crumbs">${ds.map(([t, u]) => (u ? `<a href="${u}">${esc(t)}</a>` : esc(t))).join(" › ")}</div>`;
   const dsBenhNhom = (id) => Object.values(CMR.benhDS).filter((b) => b.nhom === id).sort((a, b) => (a.thuTu ?? 99) - (b.thuTu ?? 99) || a.ten.localeCompare(b.ten, "vi"));
 
+  // bỏ định dạng markdown + trích nguồn để hiện gọn trên một dòng
+  const tron = (s) => String(s || "").replace(/\*\*|__/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s*\((?:S|G|B)\d[^)]*\)/g, "").trim();
+  const thanhNho = (bs) => `<span class="mini">${bs.map((x) => { const xx = CMR.xungDS[x.x] || {}; return `<i class="c-${xx.loai || "giaiphau"}${x.tuyChon ? " opt" : ""}" title="${esc(xx.ten || x.x)}"></i>`; }).join("")}</span>`;
+
+  // Bảng bệnh: mỗi bệnh một dòng — tên · protocol · dấu hiệu chính · thanh xung
+  function bangBenh() {
+    return `<div class="dz-filter noprint">
+        <input id="loc" type="search" placeholder="Lọc nhanh theo tên bệnh…" autocomplete="off" aria-label="Lọc danh mục bệnh">
+        <div class="chips" id="locnhom"><button class="chip on" data-n="">Tất cả</button>${CMR.nhomDS.filter((n) => dsBenhNhom(n.id).length).map((n) => `<button class="chip" data-n="${n.id}" style="--gc:${n.mau}"><i></i>${esc(n.ten)}</button>`).join("")}</div>
+      </div>
+      <div class="dzt" id="dzt">
+        <div class="dzt-h"><span>Bệnh</span><span>Protocol</span><span>Dấu hiệu MRI chính</span><span>Chuỗi xung</span></div>
+        ${CMR.nhomDS.map((n) => {
+          const ds = dsBenhNhom(n.id);
+          if (!ds.length) return "";
+          return `<section class="dzt-g" id="${n.id}" data-n="${n.id}" style="--gc:${n.mau}"><h2>${esc(n.ten)} <small>${ds.length}</small></h2>${ds.map((b) => `
+            <a class="dzt-r" href="#/benh/${b.id}" data-k="${esc(boDau([b.ten, b.tenEn, (b.vietTat || []).join(" "), (b.tuKhoa || []).join(" ")].join(" ")))}">
+              <span class="c-ten"><b>${esc(b.ten)}</b>${b.tenEn ? `<small>${esc(b.tenEn)}</small>` : ""}</span>
+              <span class="c-pr">${(b.protocol || []).map((m) => `<em>${esc(m)}</em>`).join("")}</span>
+              <span class="c-dh">${esc(tron((b.dauHieu || [])[0] || b.moTaNgan))}</span>
+              <span class="c-x">${thanhNho(cacBuoc(b))}</span>
+            </a>`).join("")}</section>`;
+        }).join("")}
+        <p class="muted small" id="dzt-rong" hidden>Không có bệnh nào khớp. Thử từ khác hoặc viết tắt (HCM, ARVC…).</p>
+      </div>`;
+  }
+  function ganLocBenh() {
+    const o = $("#loc"); if (!o) return;
+    let nhom = "";
+    const loc = () => {
+      const q = boDau(o.value.trim());
+      let con = 0;
+      document.querySelectorAll(".dzt-g").forEach((g) => {
+        let n = 0;
+        g.querySelectorAll(".dzt-r").forEach((r) => { const ok = (!nhom || g.dataset.n === nhom) && (!q || r.dataset.k.includes(q)); r.hidden = !ok; if (ok) n++; });
+        g.hidden = !n; con += n;
+      });
+      $("#dzt-rong").hidden = !!con;
+    };
+    o.addEventListener("input", loc);
+    $("#locnhom").addEventListener("click", (e) => {
+      const c = e.target.closest("button[data-n]"); if (!c) return;
+      nhom = c.dataset.n;
+      document.querySelectorAll("#locnhom .chip").forEach((x) => x.classList.toggle("on", x === c));
+      loc();
+    });
+  }
+
   function trangChu() {
     tieuDe("");
     const ganDay = luu.doc("cmr-gan-day", []).map((id) => CMR.benhDS[id]).filter(Boolean);
-    const mau = CMR.protocolDS["P5"] || Object.values(CMR.protocolDS)[0];
-    const soBenh = Object.keys(CMR.benhDS).length;
+    const soBenh = Object.keys(CMR.benhDS).length, soP = Object.keys(CMR.protocolDS).length;
     main().innerHTML = `
-      <section class="hero">
-        <div>
-          <h1>Chọn đúng protocol MRI tim cho từng bệnh</h1>
-          <p>${soBenh} bệnh, mỗi bệnh có protocol chụp theo thứ tự, dấu hiệu hình ảnh, tiêu chuẩn chẩn đoán và chẩn đoán phân biệt. Tìm nhanh bằng ô tìm kiếm phía trên (phím /).</p>
-          <div class="acts">
-            <a class="btn" href="#/cong-cu/chon-protocol">Chọn protocol theo chỉ định</a>
-            <a class="btn alt" href="#/cong-cu/tra-nguoc">Tra ngược từ dấu hiệu</a>
-          </div>
-        </div>
-        ${mau ? `<div class="heroscan"><h3>${esc(mau.ma)} · ${esc(mau.ten)}</h3><div class="muted">Mỗi protocol hiển thị dạng thanh chụp theo thứ tự; bấm vào khối để xem chuỗi xung.</div>${thanhChup(mau.buoc)}</div>` : ""}
+      <section class="home-head">
+        <h1>Tra cứu MRI tim</h1>
+        <p class="muted">${soBenh} bệnh · ${soP} protocol · đi theo đúng thứ tự công việc: chọn protocol trước khi chụp, rồi tra dấu hiệu khi đọc phim.</p>
       </section>
-      ${ganDay.length ? `<div class="recent"><b>Xem gần đây:</b> ${ganDay.map((b) => `<a href="#/benh/${b.id}">${esc(b.ten)}</a>`).join("")}</div>` : ""}
-      <div class="sec-title"><h2>Nhóm bệnh</h2><a href="#/benh">Xem tất cả</a></div>
-      <div class="groups">${CMR.nhomDS.map((n) => {
-        const ds = dsBenhNhom(n.id);
-        return `<div class="group" style="--gc:${n.mau}"><h3><a href="#/benh#${n.id}">${esc(n.ten)}</a></h3><ul>${ds.map((b) => `<li><a href="#/benh/${b.id}">${esc(b.ten)}</a></li>`).join("") || '<li class="muted">Chưa có bệnh</li>'}</ul></div>`;
-      }).join("")}</div>`;
+      <section class="flow">
+        <div class="step">
+          <div class="step-h"><span class="no">1</span><h2>Trước chụp</h2></div>
+          <p>Có câu hỏi lâm sàng hoặc bệnh nghi ngờ → chụp những xung nào, theo thứ tự nào.</p>
+          <a class="go" href="#/cong-cu/chon-protocol"><b>Chọn protocol theo chỉ định</b><span>Lâm sàng, siêu âm, men tim → protocol + lưu ý an toàn</span></a>
+          <a class="go" href="#/protocol"><b>Danh sách ${soP} protocol</b><span>Thứ tự xung, thời điểm tiêm thuốc, thời gian</span></a>
+        </div>
+        <div class="step">
+          <div class="step-h"><span class="no">2</span><h2>Đọc phim</h2></div>
+          <p>Thấy dấu hiệu trên phim → nghĩ đến bệnh nào, phân biệt bằng gì.</p>
+          <a class="go" href="#/cong-cu/tra-nguoc"><b>Tra ngược từ dấu hiệu</b><span>Kiểu LGE, mapping, hình thái → bệnh phù hợp</span></a>
+          <a class="go" href="#/cong-cu/so-sanh"><b>So sánh bệnh</b><span>Đặt 2–3 bệnh cạnh nhau, cùng mục cùng hàng</span></a>
+        </div>
+        <div class="step ref">
+          <div class="step-h"><span class="no">+</span><h2>Tham khảo nhanh</h2></div>
+          <p>Số liệu cần khi viết kết quả.</p>
+          <a class="go" href="#/tham-khao/gia-tri-binh-thuong"><b>Giá trị bình thường</b><span>Thể tích, EF, khối cơ, T1/T2/ECV</span></a>
+          <a class="go" href="#/cong-cu/may-tinh"><b>Máy tính</b><span>ECV, BSA, Qp/Qs, phân suất hở, T2*</span></a>
+        </div>
+      </section>
+      ${ganDay.length ? `<div class="recent"><b>Xem gần đây</b>${ganDay.map((b) => `<a class="chip" href="#/benh/${b.id}">${esc(b.ten)}</a>`).join("")}</div>` : ""}
+      <div class="sec-title"><h2>Danh mục bệnh</h2><span class="muted small">Mỗi bệnh một dòng; bấm để xem chi tiết</span></div>
+      ${bangBenh()}`;
+    ganLocBenh();
   }
 
   function trangDsBenh() {
     tieuDe("Bệnh");
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Bệnh"]]) + `<h1>Tra cứu theo bệnh</h1>
-      <p class="muted">Thanh màu dưới mỗi bệnh là các chuỗi xung chính của protocol.</p>` +
-      CMR.nhomDS.map((n) => {
-        const ds = dsBenhNhom(n.id);
-        if (!ds.length) return "";
-        return `<section class="list-group" id="${n.id}" style="--gc:${n.mau}"><h2>${esc(n.ten)}</h2><div class="cards">${ds.map(theBenh).join("")}</div></section>`;
-      }).join("");
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Danh mục bệnh"]]) + `<h1>Danh mục bệnh</h1>
+      <p class="muted">Mỗi bệnh một dòng: protocol dùng, dấu hiệu MRI chính và các chuỗi xung theo thứ tự chụp (màu theo loại xung).</p>` + bangBenh();
+    ganLocBenh();
     const h = location.hash.split("#")[2];
     if (h) { const el = document.getElementById(h); if (el) el.scrollIntoView(); }
-  }
-  function theBenh(b) {
-    const bs = cacBuoc(b);
-    return `<a class="card" href="#/benh/${b.id}"><div class="t">${esc(b.ten)}</div><div class="s">${esc(b.tenEn || "")}</div>
-      ${b.moTaNgan ? `<div class="d">${esc(b.moTaNgan)}</div>` : ""}
-      <div class="mini">${bs.map((x) => `<i class="c-${(CMR.xungDS[x.x] || {}).loai || "giaiphau"}"></i>`).join("")}</div></a>`;
   }
 
   function trangBenh(id) {
@@ -270,55 +318,92 @@
     const n = nhomCua(b.nhom);
     const ps = (b.protocol || []).map((m) => CMR.protocolDS[m]).filter(Boolean);
     const hinh = (b.hinh || []).map((h) => `<figure><img loading="lazy" src="${esc(h.src)}" alt="${esc(h.chuThich)}" data-cap="${esc(h.chuThich + (h.nguon ? " (" + h.nguon + ")" : ""))}"><figcaption>${esc(h.chuThich)}${h.nguon ? ` <span class="src">(${esc(h.nguon)})</span>` : ""}</figcaption></figure>`).join("");
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Bệnh", "#/benh"], [n.ten, "#/benh#" + n.id], [b.ten]]) + `
+
+    // Chia nội dung theo mục ## : 4 mục đầu là "Trước chụp", còn lại là "Đọc phim"
+    const tam = document.createElement("div");
+    tam.innerHTML = md(b.noiDung);
+    const TRUOC = ["tong quan", "dac diem lam sang", "chi dinh", "protocol"];
+    const muc = { truoc: "", doc: "" };
+    let dang = "truoc", dau = "";
+    [...tam.childNodes].forEach((nd) => {
+      if (nd.nodeName === "H2") dang = TRUOC.some((t) => boDau(nd.textContent).startsWith(t)) ? "truoc" : "doc";
+      const html = nd.outerHTML || (nd.textContent.trim() ? esc(nd.textContent) : "");
+      if (nd.nodeName !== "H2" && !muc.truoc && !muc.doc && dang === "truoc") dau += html; else muc[dang] += html;
+    });
+    if (hinh) muc.doc += `<h2>Hình ảnh minh họa</h2><div class="figs">${hinh}</div>`;
+    const tab = new URLSearchParams(location.hash.split("?")[1] || "").get("tab") || luu.doc("cmr-tab", "truoc");
+    const bat = tab === "doc" ? "doc" : "truoc";
+
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Danh mục bệnh", "#/benh"], [n.ten, "#/benh#" + n.id], [b.ten]]) + `
       <div class="dz-head">
         <div><h1>${esc(b.ten)}</h1><p class="en">${esc(b.tenEn || "")}${b.vietTat && b.vietTat.length ? " · " + esc(b.vietTat.join(", ")) : ""}</p></div>
         <div class="dz-tools noprint">
-          <a class="btn alt small" href="#/cong-cu/so-sanh?ds=${id}">So sánh với bệnh khác</a>
-          <button class="btn alt small" onclick="window.print()">In / lưu PDF</button>
+          <a class="btn alt small" href="#/cong-cu/so-sanh?ds=${id}">So sánh</a>
+          <button class="btn alt small" onclick="window.print()">In / PDF</button>
         </div>
       </div>
-      <div class="summary">
-        <div class="panel">
-          <h2>Protocol khuyến nghị</h2>
+      <div class="factbar">
+        <span class="fb-g" style="--gc:${n.mau}"><i></i>${esc(n.ten)}</span>
+        ${ps.length ? `<span><b>Protocol</b> ${ps.map((p) => `<a href="#/protocol/${p.ma}" title="${esc(p.ten)}">${esc(p.ma)} · ${esc(p.ten)}</a>`).join(", ")}</span>` : ""}
+        ${b.thoiGian ? `<span><b>Thời gian</b> ${esc(b.thoiGian)}</span>` : ""}
+        ${b.tuongPhan === null ? "" : `<span class="pill ${b.tuongPhan === false ? "" : "yes"}">${b.tuongPhan === false ? "Không cần thuốc Gd" : "Cần thuốc Gd"}</span>`}
+        ${b.stress ? `<span class="pill yes">Stress: ${esc(b.stress)}</span>` : ""}
+      </div>
+      ${dau ? `<div class="md lead">${dau}</div>` : ""}
+      <div class="tabs noprint" role="tablist">
+        <button role="tab" data-tab="truoc" aria-selected="${bat === "truoc"}"><span class="no">1</span>Trước chụp<small>lâm sàng · chỉ định · protocol</small></button>
+        <button role="tab" data-tab="doc" aria-selected="${bat === "doc"}"><span class="no">2</span>Đọc phim<small>dấu hiệu · chẩn đoán · phân biệt · kết luận</small></button>
+      </div>
+      <section class="tp${bat === "truoc" ? " on" : ""}" data-tp="truoc">
+        <div class="panel scanpanel">
+          <h3>Thứ tự chụp</h3>
           ${thanhChup(cacBuoc(b))}
-          <div class="facts">
-            ${ps.length ? `<span><b>Protocol:</b> ${ps.map((p) => `<a href="#/protocol/${p.ma}">${esc(p.ma)} · ${esc(p.ten)}</a>`).join(", ")}</span>` : ""}
-            ${b.thoiGian ? `<span><b>Thời gian:</b> ${esc(b.thoiGian)}</span>` : ""}
-            ${b.tuongPhan === null ? "" : `<span class="pill ${b.tuongPhan === false ? "" : "yes"}">${b.tuongPhan === false ? "Không cần thuốc tương phản" : "Cần thuốc tương phản (Gd)"}</span>`}
-            ${b.stress ? `<span class="pill yes">Cần stress: ${esc(b.stress)}</span>` : ""}
-          </div>
-          ${b.lgeVung ? `<h2 style="margin-top:16px">Vị trí LGE điển hình (17 vùng AHA)</h2>` + bullseye(b.lgeVung, b.lgeGhi) : ""}
         </div>
-        <div class="panel">
-          <h2>Dấu hiệu MRI then chốt</h2>
-          <ul class="keysigns">${(b.dauHieu || []).map((d) => `<li>${md(d).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul>
+        <nav class="toc" aria-label="Mục lục"></nav>
+        <article class="md">${muc.truoc}</article>
+      </section>
+      <section class="tp${bat === "doc" ? " on" : ""}" data-tp="doc">
+        <div class="keygrid${b.lgeVung ? "" : " one"}">
+          <div class="panel"><h3>Dấu hiệu MRI then chốt</h3>
+            <ul class="keysigns">${(b.dauHieu || []).map((d) => `<li>${md(d).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul></div>
+          ${b.lgeVung ? `<div class="panel"><h3>Vị trí LGE điển hình <span class="muted small">(17 vùng AHA)</span></h3>${bullseye(b.lgeVung, b.lgeGhi)}</div>` : ""}
         </div>
-      </div>
-      <div class="dz-body">
-        <nav class="toc" aria-label="Mục lục"><b>Mục lục</b><div id="tocl"></div></nav>
-        <article class="md" id="nd">${md(b.noiDung)}
-          ${hinh ? `<h2>Hình ảnh minh họa</h2><div class="figs">${hinh}</div>` : ""}
-          ${b.nguon && b.nguon.length ? `<h2>Tài liệu tham khảo</h2><ul>${b.nguon.map((x) => `<li>${md(x).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul>` : ""}
-        </article>
-      </div>`;
-    hoanThienBaiViet();
+        <nav class="toc" aria-label="Mục lục"></nav>
+        <article class="md">${muc.doc}</article>
+      </section>
+      ${b.nguon && b.nguon.length ? `<div class="md refs"><h2>Tài liệu tham khảo</h2><ul>${b.nguon.map((x) => `<li>${md(x).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul></div>` : ""}`;
+
+    document.querySelectorAll(".tp").forEach((tp) => hoanThienBaiViet(tp));
+    $(".tabs").addEventListener("click", (e) => {
+      const nut = e.target.closest("button[data-tab]"); if (!nut) return;
+      const t = nut.dataset.tab;
+      luu.ghi("cmr-tab", t);
+      document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === nut));
+      document.querySelectorAll(".tp").forEach((x) => x.classList.toggle("on", x.dataset.tp === t));
+    });
   }
 
-  function hoanThienBaiViet() {
-    const nd = $("#nd");
+  // Gắn id cho tiêu đề, dựng thanh mục lục ngang (nav.toc) phía trên bài viết
+  function hoanThienBaiViet(vung) {
+    const goc = vung || main();
+    const nd = goc.querySelector("article.md");
+    if (!nd) return;
     gắnIdTieuDe(nd);
-    const toc = $("#tocl");
+    const toc = goc.querySelector("nav.toc");
+    const ds = [...nd.querySelectorAll("h2")];
     if (toc) {
-      toc.innerHTML = [...nd.querySelectorAll("h2")].map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent)}</a>`).join("");
-      toc.addEventListener("click", (e) => {
-        const a = e.target.closest("a[data-to]"); if (!a) return;
-        e.preventDefault(); document.getElementById(a.dataset.to).scrollIntoView({ behavior: "smooth" });
-      });
+      if (ds.length < 2) toc.remove();
+      else {
+        toc.innerHTML = ds.map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent.replace(/\s*\((?:S|G|B)\d[^)]*\)/g, "").trim())}</a>`).join("");
+        toc.addEventListener("click", (e) => {
+          const a = e.target.closest("a[data-to]"); if (!a) return;
+          e.preventDefault(); document.getElementById(a.dataset.to).scrollIntoView({ behavior: "smooth" });
+        });
+      }
     }
     // ảnh trong nội dung -> phóng to
-    document.querySelectorAll("#main img").forEach((img) => img.addEventListener("click", () => phongTo(img)));
-    // liên kết nội bộ dạng #/... trong markdown giữ nguyên; liên kết ngoài mở tab mới
+    goc.querySelectorAll("img").forEach((img) => { if (!img.dataset.z) { img.dataset.z = 1; img.addEventListener("click", () => phongTo(img)); } });
+    // liên kết ngoài mở tab mới
     nd.querySelectorAll('a[href^="http"]').forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
   }
   function phongTo(img) {
@@ -333,11 +418,13 @@
   function trangDsProtocol() {
     tieuDe("Protocol");
     const ds = Object.values(CMR.protocolDS).sort((a, b) => parseInt(a.ma.slice(1)) - parseInt(b.ma.slice(1)));
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Protocol"]]) + `<h1>Protocol chuẩn</h1>
-      <p class="muted">Mỗi protocol là chuỗi xung chụp theo thứ tự. Khối sọc là bước tùy chọn; giọt vàng là thời điểm tiêm thuốc tương phản.</p>
-      <div class="grid g2">${ds.map((p) => `<div class="panel"><h3 style="margin:0 0 4px"><a href="#/protocol/${p.ma}">${esc(p.ma)} · ${esc(p.ten)}</a></h3>
-        <div class="muted small">${esc(p.chiDinhNgan || "")}</div>${thanhChup(p.buoc, false)}
-        <div class="facts">${p.thoiGian ? `<span><b>Thời gian:</b> ${esc(p.thoiGian)}</span>` : ""}</div></div>`).join("")}</div>`;
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Protocol"]]) + `<h1>Danh sách protocol</h1>
+      <p class="muted">Mỗi protocol một dòng, các khối là chuỗi xung theo thứ tự chụp. Khối sọc = tùy chọn; giọt vàng = thời điểm tiêm thuốc Gd. Bấm tên protocol để xem chi tiết từng bước.</p>
+      <div class="prt">${ds.map((p) => `<div class="prt-r">
+        <a class="prt-ma" href="#/protocol/${p.ma}">${esc(p.ma)}</a>
+        <div class="prt-t"><a href="#/protocol/${p.ma}"><b>${esc(p.ten)}</b></a><span>${esc(p.chiDinhNgan || "")}</span>${p.thoiGian ? `<span class="tg">${esc(p.thoiGian)}</span>` : ""}</div>
+        <div class="prt-x">${thanhChup(p.buoc, false)}</div></div>`).join("")}</div>
+      <div class="scan-legend standalone">${Object.keys(LOAI_XUNG).filter((l) => Object.values(CMR.xungDS).some((x) => x.loai === l)).map((l) => `<span><i class="c-${l}"></i>${esc(LOAI_XUNG[l])}</span>`).join("")}</div>`;
   }
   function trangProtocol(ma) {
     const p = CMR.protocolDS[ma];
@@ -347,14 +434,14 @@
     main().innerHTML = crumbs([["Trang chủ", "#/"], ["Protocol", "#/protocol"], [p.ma]]) + `
       <div class="dz-head"><div><h1>${esc(p.ma)} · ${esc(p.ten)}</h1><p class="en">${esc(p.chiDinhNgan || "")}</p></div>
       <div class="dz-tools noprint"><button class="btn alt small" onclick="window.print()">In checklist</button></div></div>
-      <div class="panel" style="margin:12px 0 20px">${thanhChup(p.buoc)}
-        <div class="facts">${p.thoiGian ? `<span><b>Thời gian ước tính:</b> ${esc(p.thoiGian)}</span>` : ""}
-        ${benh.length ? `<span><b>Dùng cho:</b> ${benh.map((b) => `<a href="#/benh/${b.id}">${esc(b.ten)}</a>`).join(", ")}</span>` : ""}</div></div>
-      <div class="dz-body"><nav class="toc"><b>Mục lục</b><div id="tocl"></div></nav>
+      <div class="factbar">${p.thoiGian ? `<span><b>Thời gian</b> ${esc(p.thoiGian)}</span>` : ""}
+        ${benh.length ? `<span><b>Dùng cho</b> ${benh.map((b) => `<a href="#/benh/${b.id}">${esc(b.ten)}</a>`).join(", ")}</span>` : ""}</div>
+      <div class="panel scanpanel"><h3>Thứ tự chụp</h3>${thanhChup(p.buoc)}</div>
+      <div class="dz-body"><nav class="toc" aria-label="Mục lục"></nav>
       <article class="md" id="nd">
         <h2>Các bước chụp</h2>
-        <table><thead><tr><th>#</th><th>Chuỗi xung</th><th>Ghi chú</th></tr></thead><tbody>
-        ${p.buoc.map(buoc).map((b, i) => { const x = CMR.xungDS[b.x] || { ten: b.x }; return `<tr><td>${i + 1}</td><td><a href="#/xung/${b.x}">${esc(x.ten)}</a>${b.tuyChon ? " <span class='pill'>tùy chọn</span>" : ""}${b.gd ? " <span class='pill yes'>" + esc(b.gd === true ? "tiêm Gd trước bước này" : b.gd) + "</span>" : ""}</td><td>${esc(b.ghi || "")}</td></tr>`; }).join("")}
+        <table class="steps-t"><thead><tr><th>#</th><th>Chuỗi xung</th><th>Để đánh giá</th><th>Ghi chú</th></tr></thead><tbody>
+        ${p.buoc.map(buoc).map((b, i) => { const x = CMR.xungDS[b.x] || { ten: b.x }; return `<tr><td><span class="sw c-${x.loai || "giaiphau"}"></span>${i + 1}</td><td><a href="#/xung/${b.x}">${esc(x.ten)}</a>${b.tuyChon ? " <span class='pill'>tùy chọn</span>" : ""}${b.gd ? " <span class='pill yes'>" + esc(b.gd === true ? "tiêm Gd trước bước này" : b.gd) + "</span>" : ""}</td><td class="small">${esc(x.moTaNgan || "")}</td><td class="small">${esc(b.ghi || "")}</td></tr>`; }).join("")}
         </tbody></table>
         ${md(p.noiDung)}
       </article></div>`;
@@ -377,7 +464,7 @@
     main().innerHTML = crumbs([["Trang chủ", "#/"], ["Chuỗi xung", "#/xung"], [x.ten]]) + `
       <h1>${esc(x.ten)}</h1><p class="en muted">${esc(x.tenEn || "")} <span class="chip x c-${x.loai}">${esc(LOAI_XUNG[x.loai])}</span></p>
       ${dung.length ? `<p class="small"><b>Có trong protocol:</b> ${dung.map((p) => `<a href="#/protocol/${p.ma}">${p.ma}</a>`).join(", ")}</p>` : ""}
-      <div class="dz-body"><nav class="toc"><b>Mục lục</b><div id="tocl"></div></nav><article class="md" id="nd">${md(x.noiDung)}</article></div>`;
+      <div class="dz-body"><nav class="toc" aria-label="Mục lục"></nav><article class="md" id="nd">${md(x.noiDung)}</article></div>`;
     hoanThienBaiViet();
   }
 
@@ -395,7 +482,7 @@
     tieuDe(t.ten);
     main().innerHTML = crumbs([["Trang chủ", "#/"], ["Tham khảo", "#/tham-khao"], [t.ten]]) + `<h1>${esc(t.ten)}</h1>
       ${t.moTa ? `<p class="muted">${esc(t.moTa)}</p>` : ""}
-      <div class="dz-body"><nav class="toc"><b>Mục lục</b><div id="tocl"></div></nav><article class="md" id="nd">${md(t.noiDung)}</article></div>`;
+      <div class="dz-body"><nav class="toc" aria-label="Mục lục"></nav><article class="md" id="nd">${md(t.noiDung)}</article></div>`;
     hoanThienBaiViet();
   }
   function trangTaiLieu() {
@@ -438,16 +525,19 @@
     tieuDe("Chọn protocol");
     const nhomCD = {};
     CMR.chiDinhDS.forEach((c) => (nhomCD[c.nhom] = nhomCD[c.nhom] || []).push(c));
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Công cụ", "#/cong-cu"], ["Chọn protocol"]]) + `<h1>Chọn protocol theo chỉ định</h1>
-      <ol class="steps">
-        <li><h3>Câu hỏi lâm sàng hoặc bệnh nghi ngờ</h3>
-          ${Object.entries(nhomCD).map(([g, ds]) => `<p class="small muted" style="margin:12px 0 6px">${esc(g)}</p><div class="opts">${ds.map((c) => `<label class="opt"><input type="radio" name="cd" value="${c.id}"><span>${esc(c.ten)}</span></label>`).join("")}</div>`).join("")}
-        </li>
-        <li><h3>Tình trạng bệnh nhân (chọn nếu có)</h3>
-          <div class="opts">${TINH_TRANG.map(([k, t]) => `<label class="opt"><input type="checkbox" name="tt" value="${k}"><span>${esc(t)}</span></label>`).join("")}</div>
-        </li>
-        <li><h3>Kết quả</h3><div id="kq" class="muted">Chọn chỉ định ở bước 1.</div></li>
-      </ol>`;
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Trước chụp"], ["Chọn protocol"]]) + `<h1>Chọn protocol theo chỉ định</h1>
+      <p class="muted">Dựa trên lâm sàng, siêu âm tim, men tim… chọn câu hỏi cần trả lời; kết quả hiện ở cột bên phải.</p>
+      <div class="split">
+        <ol class="steps">
+          <li><h3>Câu hỏi lâm sàng hoặc bệnh nghi ngờ</h3>
+            ${Object.entries(nhomCD).map(([g, ds]) => `<details class="cdg" open><summary>${esc(g)} <span class="muted small">${ds.length}</span></summary><div class="opts">${ds.map((c) => `<label class="opt"><input type="radio" name="cd" value="${c.id}"><span>${esc(c.ten)}</span></label>`).join("")}</div></details>`).join("")}
+          </li>
+          <li><h3>Tình trạng bệnh nhân <span class="muted small">(chọn nếu có)</span></h3>
+            <div class="opts">${TINH_TRANG.map(([k, t]) => `<label class="opt"><input type="checkbox" name="tt" value="${k}"><span>${esc(t)}</span></label>`).join("")}</div>
+          </li>
+        </ol>
+        <div class="split-r"><div class="sticky"><h3 class="kq-h"><span class="no">3</span>Kết quả</h3><div id="kq" class="muted">Chọn chỉ định ở bước 1.</div></div></div>
+      </div>`;
     const cap = () => {
       document.querySelectorAll("label.opt").forEach((l) => l.classList.toggle("sel", l.querySelector("input").checked));
       const cd = CMR.chiDinhDS.find((c) => c.id === ($('input[name="cd"]:checked') || {}).value);
@@ -472,12 +562,12 @@
   function trangTraNguoc() {
     tieuDe("Tra ngược từ dấu hiệu");
     const chon = new Set((new URLSearchParams(location.hash.split("?")[1] || "").get("d") || "").split(",").filter(Boolean));
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Công cụ", "#/cong-cu"], ["Tra ngược"]]) + `<h1>Tra ngược từ dấu hiệu hình ảnh</h1>
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Đọc phim"], ["Tra ngược"]]) + `<h1>Tra ngược từ dấu hiệu hình ảnh</h1>
       <p class="muted">Chọn các dấu hiệu thấy trên phim. Danh sách bệnh xếp theo số dấu hiệu trùng khớp. Đây là gợi ý để đọc tiếp, không thay thế đánh giá lâm sàng.</p>
-      <div class="dz-body" style="grid-template-columns: minmax(0,1.1fr) minmax(0,1fr)">
+      <div class="split">
         <div>${DAU_HIEU.map((g) => `<h3>${esc(g.nhom)}</h3><div class="opts">${g.ds.map(([k, t]) => `<label class="opt"><input type="checkbox" value="${k}" ${chon.has(k) ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}</div>`).join("")}
         <p style="margin-top:14px"><button class="btn alt small" id="xoa">Bỏ chọn tất cả</button></p></div>
-        <div><div style="position:sticky;top:80px"><h3>Bệnh phù hợp</h3><div id="kq" class="muted">Chưa chọn dấu hiệu.</div></div></div>
+        <div class="split-r"><div class="sticky"><h3 class="kq-h">Bệnh phù hợp</h3><div id="kq" class="muted">Chưa chọn dấu hiệu.</div></div></div>
       </div>`;
     const cap = () => {
       document.querySelectorAll("label.opt").forEach((l) => l.classList.toggle("sel", l.querySelector("input").checked));
@@ -505,21 +595,36 @@
     const ids = (new URLSearchParams(location.hash.split("?")[1] || "").get("ds") || "").split(",").slice(0, 3).map((i) => (CMR.benhDS[i] ? i : ""));
     while (ids.length < 2) ids.push("");
     const tatCa = Object.values(CMR.benhDS).sort((a, b) => a.ten.localeCompare(b.ten, "vi"));
-    const chonO = (v, i) => `<select class="sel" data-i="${i}" style="font:inherit;padding:7px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);max-width:100%"><option value="">— chọn bệnh —</option>${CMR.nhomDS.map((n) => `<optgroup label="${esc(n.ten)}">${tatCa.filter((b) => b.nhom === n.id).map((b) => `<option value="${b.id}" ${b.id === v ? "selected" : ""}>${esc(b.ten)}</option>`).join("")}</optgroup>`).join("")}</select>`;
-    const cot = (id) => {
-      const b = CMR.benhDS[id];
-      if (!b) return `<div class="panel muted">Chọn một bệnh.</div>`;
-      const t = b.tomTat || {};
-      const hang = [["Lâm sàng", t.lamSang], ["Hình thái / chức năng", t.hinhThai], ["LGE", t.lge], ["Mapping / mô học", t.mapping], ["Điểm phân biệt", t.phanBiet]];
-      return `<div class="panel"><h3><a href="#/benh/${b.id}">${esc(b.ten)}</a></h3>${thanhChup(cacBuoc(b), false)}
-        <dl>${hang.filter((h) => h[1]).map(([k, v]) => `<dt>${k}</dt><dd>${md(v).replace(/^<p>|<\/p>\s*$/g, "")}</dd>`).join("")}
-        <dt>Dấu hiệu then chốt</dt><dd><ul class="keysigns">${(b.dauHieu || []).map((d) => `<li>${md(d).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul></dd></dl>
-        ${b.lgeVung ? bullseye(b.lgeVung) : ""}</div>`;
-    };
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Công cụ", "#/cong-cu"], ["So sánh"]]) + `<h1>So sánh bệnh</h1>
-      <p class="muted">Gợi ý: HCM – amyloidosis – Fabry; viêm cơ tim – NMCT – Takotsubo; DCM – bệnh cơ tim thiếu máu.</p>
-      <div class="form-row">${ids.map(chonO).join("")}${ids.length < 3 ? `<button class="btn alt small" id="them">+ Thêm bệnh thứ ba</button>` : ""}</div>
-      <div class="cmp" style="--n:${ids.length}">${ids.map(cot).join("")}</div>`;
+    const chonO = (v, i) => `<select class="sel" data-i="${i}" aria-label="Chọn bệnh ${i + 1}"><option value="">— chọn bệnh —</option>${CMR.nhomDS.map((n) => `<optgroup label="${esc(n.ten)}">${tatCa.filter((b) => b.nhom === n.id).map((b) => `<option value="${b.id}" ${b.id === v ? "selected" : ""}>${esc(b.ten)}</option>`).join("")}</optgroup>`).join("")}</select>`;
+    const bs = ids.map((i) => CMR.benhDS[i] || null);
+    const co = bs.filter(Boolean);
+    // chuỗi xung chung cho mọi bệnh đã chọn -> làm mờ, chỉ nổi phần khác nhau
+    const tapXung = co.map((b) => new Set(cacBuoc(b).map((x) => x.x)));
+    const chung = tapXung.length > 1 ? new Set([...tapXung[0]].filter((x) => tapXung.every((t) => t.has(x)))) : null;
+    const gon = (v) => md(v).replace(/^<p>|<\/p>\s*$/g, "");
+    const hang = [
+      ["Protocol", (b) => { const khac = cacBuoc(b).filter((x) => !chung || !chung.has(x.x)).map((x) => (CMR.xungDS[x.x] || { ten: x.x }).ten);
+        return `<div class="small">${(b.protocol || []).map((m) => `<a href="#/protocol/${m}">${esc(m)}</a>`).join(", ")}${b.thoiGian ? " · " + esc(b.thoiGian) : ""}</div>${thanhChup(cacBuoc(b), false, chung)}
+          ${chung ? `<div class="small diff">${khac.length ? `<b>Khác:</b> ${[...new Set(khac)].map(esc).join(", ")}` : "Không có xung riêng."}</div>` : ""}`; }],
+      ["Lâm sàng", (b) => (b.tomTat || {}).lamSang && gon(b.tomTat.lamSang)],
+      ["Hình thái / chức năng", (b) => (b.tomTat || {}).hinhThai && gon(b.tomTat.hinhThai)],
+      ["Ngấm thuốc muộn (LGE)", (b) => (b.tomTat || {}).lge && gon(b.tomTat.lge)],
+      ["Mapping / mô học", (b) => (b.tomTat || {}).mapping && gon(b.tomTat.mapping)],
+      ["Điểm phân biệt", (b) => (b.tomTat || {}).phanBiet && gon(b.tomTat.phanBiet)],
+      ["Dấu hiệu then chốt", (b) => (b.dauHieu || []).length && `<ul class="keysigns">${b.dauHieu.map((d) => `<li>${gon(d)}</li>`).join("")}</ul>`],
+      ["Vị trí LGE", (b) => b.lgeVung && bullseye(b.lgeVung)],
+    ];
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["So sánh bệnh"]]) + `<h1>So sánh bệnh</h1>
+      <p class="muted">Cùng một mục của các bệnh nằm trên cùng hàng. Ở hàng Protocol, các xung chung được làm mờ để thấy ngay xung khác nhau. Gợi ý: HCM – amyloidosis – Fabry; viêm cơ tim – NMCT – Takotsubo.</p>
+      <div class="cmpwrap"><table class="cmpt" style="--n:${ids.length}">
+        <thead><tr><th class="lab"></th>${ids.map((v, i) => `<th>${chonO(v, i)}${bs[i] ? `<a class="small" href="#/benh/${bs[i].id}">Mở trang bệnh</a>` : ""}</th>`).join("")}
+          ${ids.length < 3 ? `<th class="add"><button class="btn alt small" id="them">+ Thêm bệnh</button></th>` : ""}</tr></thead>
+        <tbody>${co.length ? hang.map(([ten, f]) => {
+          const o = bs.map((b) => (b ? f(b) || "" : ""));
+          if (!o.some(Boolean)) return "";
+          return `<tr><th class="lab" scope="row">${ten}</th>${o.map((x) => `<td>${x || '<span class="muted">—</span>'}</td>`).join("")}${ids.length < 3 ? "<td></td>" : ""}</tr>`;
+        }).join("") : `<tr><td colspan="${ids.length + 2}" class="muted">Chọn ít nhất một bệnh ở hàng trên.</td></tr>`}</tbody>
+      </table></div>`;
     const doi = () => {
       const v = [...document.querySelectorAll("select.sel")].map((s) => s.value);
       location.hash = "#/cong-cu/so-sanh?ds=" + v.join(",");
@@ -531,8 +636,9 @@
   function trangMayTinh() {
     tieuDe("Máy tính");
     const o = (id, nhan, goiY = "") => `<label class="field">${nhan}<input id="${id}" type="number" step="any" inputmode="decimal" placeholder="${goiY}"></label>`;
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Công cụ", "#/cong-cu"], ["Máy tính"]]) + `<h1>Máy tính</h1>
-      <div class="grid g2">
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Máy tính"]]) + `<h1>Máy tính</h1>
+      <p class="muted">Chọn phép tính ở cột trái; chỉ phép tính đang chọn được hiển thị.</p>
+      <div class="calc"><nav class="calcnav" aria-label="Chọn phép tính"></nav><div class="calcp">
         <div class="panel"><h3 style="margin-top:0">Thể tích ngoại bào (ECV)</h3>
           <p class="small muted">ECV = (1 − Hct) × (1/T1 cơ tim sau − 1/T1 cơ tim trước) / (1/T1 máu sau − 1/T1 máu trước). T1 tính bằng ms; T1 sau tiêm đo ≥ 15 phút (S1, tr. 17).</p>
           <div class="form-row">${o("hct", "Hematocrit (%)", "40")}${o("m1", "T1 cơ tim trước", "1000")}${o("m2", "T1 cơ tim sau", "450")}${o("b1", "T1 máu trước", "1600")}${o("b2", "T1 máu sau", "300")}</div>
@@ -561,7 +667,18 @@
           <p class="small muted">Theo bảng phân loại (S1, tr. 50). R2* = 1000 / T2*.</p>
           <div class="form-row">${o("t2c", "T2* cơ tim (ms)", "16")}${o("t2g", "T2* gan (ms)", "3")}</div>
           <div class="result" id="r-fe">Nhập ít nhất 1 giá trị.</div></div>
-      </div>`;
+      </div></div>`;
+    // mỗi phép tính một nút; chỉ hiện phép tính đang chọn
+    const panels = [...document.querySelectorAll(".calcp > .panel")];
+    const nav = $(".calcnav");
+    nav.innerHTML = panels.map((pn, i) => `<button data-i="${i}">${esc(pn.querySelector("h3").textContent)}</button>`).join("");
+    const chonPT = (i) => {
+      panels.forEach((pn, j) => (pn.hidden = j !== i));
+      nav.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-current", j === i));
+      luu.ghi("cmr-may-tinh", i);
+    };
+    nav.addEventListener("click", (e) => { const b = e.target.closest("button[data-i]"); if (b) { chonPT(+b.dataset.i); const o = panels[+b.dataset.i].querySelector("input"); if (o) o.focus(); } });
+    chonPT(Math.min(luu.doc("cmr-may-tinh", 0), panels.length - 1));
     const v = (id) => { const x = parseFloat(($("#" + id) || {}).value); return isFinite(x) ? x : null; };
     const f = (x, d = 1) => x.toLocaleString("vi-VN", { maximumFractionDigits: d, minimumFractionDigits: d });
     const tinh = () => {
@@ -601,8 +718,12 @@
     const h = (location.hash || "#/").replace(/^#/, "");
     const [duong] = h.split("?");
     const p = duong.split("#")[0].split("/").filter(Boolean);
-    document.querySelectorAll(".mainnav a").forEach((a) => a.classList.toggle("on", a.dataset.nav === (p[0] === "tai-lieu" ? "tham-khao" : p[0])));
-    $(".mainnav").classList.remove("open");
+    // tô sáng mục menu: khớp đúng "nhóm/trang" trước, sau đó khớp theo nhóm
+    const khoa1 = p.slice(0, 2).join("/"), khoa0 = p[0] === "tai-lieu" ? "tham-khao" : p[0];
+    const links = [...document.querySelectorAll(".mainnav a")];
+    const trung = links.find((a) => a.dataset.nav === khoa1) || links.find((a) => a.dataset.nav === khoa0);
+    links.forEach((a) => { a.classList.toggle("on", a === trung); if (a === trung) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    dongMenu();
     const r = {
       "": trangChu,
       benh: () => (p[1] ? trangBenh(decodeURIComponent(p[1])) : trangDsBenh()),
@@ -631,9 +752,15 @@
       document.documentElement.dataset.theme = moi; luu.ghi("cmr-giao-dien", moi);
     });
     $("#menu").addEventListener("click", () => {
-      const m = $(".mainnav"); m.classList.toggle("open");
-      $("#menu").setAttribute("aria-expanded", m.classList.contains("open"));
+      const mo = !$("#side").classList.contains("open");
+      $("#side").classList.toggle("open", mo); $("#scrim").classList.toggle("open", mo);
+      $("#menu").setAttribute("aria-expanded", mo);
     });
+    $("#scrim").addEventListener("click", dongMenu);
+  }
+  function dongMenu() {
+    $("#side").classList.remove("open"); $("#scrim").classList.remove("open");
+    $("#menu").setAttribute("aria-expanded", "false");
   }
 
   /* ---------- Tải các file nội dung theo danh mục ---------- */
