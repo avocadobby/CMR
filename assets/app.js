@@ -86,12 +86,41 @@
     ghi(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* bỏ qua */ } },
   };
 
+  /* ---------- Trích dẫn đánh số ----------
+     Trong bài ghi (S1, tr. 65) như cũ; khi hiển thị đổi thành số nhỏ ¹ và dồn danh sách đầy đủ xuống cuối trang.
+     Cùng một nguồn + trang dùng lại cùng một số. Danh sách đánh số lại từ 1 cho mỗi trang. */
+  let NGUON = { ds: [], so: {} };
+  const datLaiNguon = () => { NGUON = { ds: [], so: {} }; };
+  const tenTaiLieu = (ma) => (CMR.taiLieuDS.find((t) => t.ma === ma) || {}).ten || ma;
+  function soNguon(t) {
+    t = t.trim().replace(/\s+/g, " ");
+    if (!(t in NGUON.so)) { NGUON.ds.push(t); NGUON.so[t] = NGUON.ds.length; }
+    return NGUON.so[t];
+  }
   function md(text) {
     if (!text) return "";
     let html = window.marked ? window.marked.parse(String(text).replace(/^\n+/, "")) : "<pre>" + esc(text) + "</pre>";
-    // trích dẫn nguồn (S1, tr. 65) -> chữ nhỏ có liên kết
-    html = html.replace(/\(((?:S|G|B)\d+[^()<]{0,60})\)/g, '<a class="src" href="#/tai-lieu" title="Xem tài liệu tham khảo">($1)</a>');
+    html = html.replace(/\s?\(((?:S|G|B)\d+[^()<]{0,80})\)/g, (cu, trong) => {
+      const phan = trong.split(/;\s*/).filter(Boolean);
+      if (!phan.every((x) => /^(?:S|G|B)\d+\b/.test(x.trim()))) return cu;
+      return `<sup class="cite">${phan.map((x) => [soNguon(x), x.trim()]).sort((a, b) => a[0] - b[0]).map(([n, x]) => `<a href="#" data-ref="${n}" title="${esc(x)}">${n}</a>`).join(",")}</sup>`;
+    });
     return html;
+  }
+  // Dựng (hoặc dựng lại) danh sách nguồn ở cuối trang
+  function capNhatNguon() {
+    let o = $("#nguon-cuoi");
+    if (!NGUON.ds.length && !(o && o.dataset.them)) { if (o) o.innerHTML = ""; return; }
+    if (!o) { o = document.createElement("section"); o.id = "nguon-cuoi"; o.className = "md refs"; main().appendChild(o); }
+    const dong = NGUON.ds.map((t, i) => {
+      const m = t.match(/^((?:S|G|B)\d+)\s*,?\s*(.*)$/) || [, t, ""];
+      const tl = CMR.taiLieuDS.find((t) => t.ma === m[1]) || {};
+      return `<li id="ref-${i + 1}"><a class="rma" href="#/tai-lieu" title="${esc(tl.ten || m[1])}">${esc(m[1])}</a> ${esc(tl.tenNgan || "")}${m[2] ? ", " + esc(m[2]) : ""}</li>`;
+    }).join("");
+    const maDung = [...new Set(NGUON.ds.map((t) => (t.match(/^(?:S|G|B)\d+/) || [""])[0]).filter(Boolean))].sort();
+    o.innerHTML = `<h2>Tài liệu tham khảo</h2>${dong ? `<ol class="reflist">${dong}</ol>` : ""}
+      ${o.dataset.them ? `<p class="small muted">Chương sách liên quan: ${esc(o.dataset.them)}</p>` : ""}
+      ${maDung.length ? `<p class="small muted refkey">${maDung.map((ma) => `<b>${esc(ma)}</b>: ${esc(tenTaiLieu(ma))}`).join("<br>")}</p>` : ""}`;
   }
   function gắnIdTieuDe(root) {
     const dung = {};
@@ -273,11 +302,11 @@
     main().innerHTML = `
       <section class="home-head">
         <h1>Tra cứu MRI tim</h1>
-        <p class="muted">${soBenh} bệnh · ${soP} protocol · đi theo đúng thứ tự công việc: chọn protocol trước khi chụp, rồi tra dấu hiệu khi đọc phim.</p>
+        <p class="muted">${soBenh} bệnh · ${soP} protocol · đi theo đúng thứ tự công việc: chọn protocol trước khi chụp, rồi tra bệnh và dấu hiệu khi đọc phim.</p>
       </section>
       <section class="flow">
         <div class="step">
-          <div class="step-h"><span class="no">1</span><h2>Trước chụp</h2></div>
+          <div class="step-h"><span class="no">1</span><h2>Protocol</h2></div>
           <p>Có câu hỏi lâm sàng hoặc bệnh nghi ngờ → chụp những xung nào, theo thứ tự nào.</p>
           <a class="go" href="#/cong-cu/chon-protocol"><b>Chọn protocol theo chỉ định</b><span>Lâm sàng, siêu âm, men tim → protocol + lưu ý an toàn</span></a>
           <a class="go" href="#/protocol"><b>Danh sách ${soP} protocol</b><span>Thứ tự xung, thời điểm tiêm thuốc, thời gian</span></a>
@@ -285,6 +314,7 @@
         <div class="step">
           <div class="step-h"><span class="no">2</span><h2>Đọc phim</h2></div>
           <p>Thấy dấu hiệu trên phim → nghĩ đến bệnh nào, phân biệt bằng gì.</p>
+          <a class="go" href="#/benh"><b>Danh mục ${soBenh} bệnh</b><span>${CMR.nhomDS.filter((n) => dsBenhNhom(n.id).length).length} nhóm, mỗi bệnh một dòng, lọc nhanh theo tên</span></a>
           <a class="go" href="#/cong-cu/tra-nguoc"><b>Tra ngược từ dấu hiệu</b><span>Kiểu LGE, mapping, hình thái → bệnh phù hợp</span></a>
           <a class="go" href="#/cong-cu/so-sanh"><b>So sánh bệnh</b><span>Đặt 2–3 bệnh cạnh nhau, cùng mục cùng hàng</span></a>
         </div>
@@ -295,10 +325,7 @@
           <a class="go" href="#/cong-cu/may-tinh"><b>Máy tính</b><span>ECV, BSA, Qp/Qs, phân suất hở, T2*</span></a>
         </div>
       </section>
-      ${ganDay.length ? `<div class="recent"><b>Xem gần đây</b>${ganDay.map((b) => `<a class="chip" href="#/benh/${b.id}">${esc(b.ten)}</a>`).join("")}</div>` : ""}
-      <div class="sec-title"><h2>Danh mục bệnh</h2><span class="muted small">Mỗi bệnh một dòng; bấm để xem chi tiết</span></div>
-      ${bangBenh()}`;
-    ganLocBenh();
+      ${ganDay.length ? `<div class="recent"><b>Xem gần đây</b>${ganDay.map((b) => `<a class="chip" href="#/benh/${b.id}">${esc(b.ten)}</a>`).join("")}</div>` : ""}`;
   }
 
   function trangDsBenh() {
@@ -317,11 +344,11 @@
     const gd = luu.doc("cmr-gan-day", []).filter((x) => x !== id); gd.unshift(id); luu.ghi("cmr-gan-day", gd.slice(0, 8));
     const n = nhomCua(b.nhom);
     const ps = (b.protocol || []).map((m) => CMR.protocolDS[m]).filter(Boolean);
-    const hinh = (b.hinh || []).map((h) => `<figure><img loading="lazy" src="${esc(h.src)}" alt="${esc(h.chuThich)}" data-cap="${esc(h.chuThich + (h.nguon ? " (" + h.nguon + ")" : ""))}"><figcaption>${esc(h.chuThich)}${h.nguon ? ` <span class="src">(${esc(h.nguon)})</span>` : ""}</figcaption></figure>`).join("");
 
-    // Chia nội dung theo mục ## : 4 mục đầu là "Trước chụp", còn lại là "Đọc phim"
+    // Chia nội dung theo mục ## : 4 mục đầu ở tab "Protocol", còn lại ở tab "Đọc phim"
     const tam = document.createElement("div");
     tam.innerHTML = md(b.noiDung);
+    const hinh = (b.hinh || []).map((h) => `<figure><img loading="lazy" src="${esc(h.src)}" alt="${esc(h.chuThich)}" data-cap="${esc(h.chuThich + (h.nguon ? " (" + h.nguon + ")" : ""))}"><figcaption>${esc(h.chuThich)}${h.nguon ? `<sup class="cite"><a href="#" data-ref="${soNguon(h.nguon)}" title="${esc(h.nguon)}">${soNguon(h.nguon)}</a></sup>` : ""}</figcaption></figure>`).join("");
     const TRUOC = ["tong quan", "dac diem lam sang", "chi dinh", "protocol"];
     const muc = { truoc: "", doc: "" };
     let dang = "truoc", dau = "";
@@ -351,7 +378,7 @@
       </div>
       ${dau ? `<div class="md lead">${dau}</div>` : ""}
       <div class="tabs noprint" role="tablist">
-        <button role="tab" data-tab="truoc" aria-selected="${bat === "truoc"}"><span class="no">1</span>Trước chụp<small>lâm sàng · chỉ định · protocol</small></button>
+        <button role="tab" data-tab="truoc" aria-selected="${bat === "truoc"}"><span class="no">1</span>Protocol<small>lâm sàng · chỉ định · thứ tự chụp</small></button>
         <button role="tab" data-tab="doc" aria-selected="${bat === "doc"}"><span class="no">2</span>Đọc phim<small>dấu hiệu · chẩn đoán · phân biệt · kết luận</small></button>
       </div>
       <section class="tp${bat === "truoc" ? " on" : ""}" data-tp="truoc">
@@ -371,7 +398,7 @@
         <nav class="toc" aria-label="Mục lục"></nav>
         <article class="md">${muc.doc}</article>
       </section>
-      ${b.nguon && b.nguon.length ? `<div class="md refs"><h2>Tài liệu tham khảo</h2><ul>${b.nguon.map((x) => `<li>${md(x).replace(/^<p>|<\/p>\s*$/g, "")}</li>`).join("")}</ul></div>` : ""}`;
+      <section class="md refs" id="nguon-cuoi" data-them="${esc((b.nguon || []).join("; "))}"></section>`;
 
     document.querySelectorAll(".tp").forEach((tp) => hoanThienBaiViet(tp));
     $(".tabs").addEventListener("click", (e) => {
@@ -380,6 +407,7 @@
       luu.ghi("cmr-tab", t);
       document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === nut));
       document.querySelectorAll(".tp").forEach((x) => x.classList.toggle("on", x.dataset.tp === t));
+      ganTheoDoiMucLuc();
     });
   }
 
@@ -394,7 +422,7 @@
     if (toc) {
       if (ds.length < 2) toc.remove();
       else {
-        toc.innerHTML = ds.map((h) => `<a href="#" data-to="${h.id}">${esc(h.textContent.replace(/\s*\((?:S|G|B)\d[^)]*\)/g, "").trim())}</a>`).join("");
+        toc.innerHTML = ds.map((h) => { const c = h.cloneNode(true); c.querySelectorAll(".cite").forEach((x) => x.remove()); return `<a href="#" data-to="${h.id}">${esc(c.textContent.trim())}</a>`; }).join("");
         toc.addEventListener("click", (e) => {
           const a = e.target.closest("a[data-to]"); if (!a) return;
           e.preventDefault(); document.getElementById(a.dataset.to).scrollIntoView({ behavior: "smooth" });
@@ -525,7 +553,7 @@
     tieuDe("Chọn protocol");
     const nhomCD = {};
     CMR.chiDinhDS.forEach((c) => (nhomCD[c.nhom] = nhomCD[c.nhom] || []).push(c));
-    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Trước chụp"], ["Chọn protocol"]]) + `<h1>Chọn protocol theo chỉ định</h1>
+    main().innerHTML = crumbs([["Trang chủ", "#/"], ["Protocol"], ["Chọn protocol"]]) + `<h1>Chọn protocol theo chỉ định</h1>
       <p class="muted">Dựa trên lâm sàng, siêu âm tim, men tim… chọn câu hỏi cần trả lời; kết quả hiện ở cột bên phải.</p>
       <div class="split">
         <ol class="steps">
@@ -543,6 +571,7 @@
       const cd = CMR.chiDinhDS.find((c) => c.id === ($('input[name="cd"]:checked') || {}).value);
       const tt = [...document.querySelectorAll('input[name="tt"]:checked')].map((i) => i.value);
       if (!cd) { $("#kq").innerHTML = "Chọn chỉ định ở bước 1."; return; }
+      datLaiNguon();
       const p = CMR.protocolDS[cd.protocol];
       const benh = (cd.benh || []).map((i) => CMR.benhDS[i]).filter(Boolean);
       let html = `<div class="panel"><h3 style="margin-top:0">${p ? `<a href="#/protocol/${p.ma}">${p.ma} · ${esc(p.ten)}</a>` : esc(cd.protocol)}</h3>
@@ -555,6 +584,7 @@
       }
       html += `<p class="small" style="margin-top:12px"><button class="btn alt small noprint" onclick="window.print()">In checklist</button></p>`;
       $("#kq").innerHTML = html; $("#kq").classList.remove("muted");
+      capNhatNguon();
     };
     main().addEventListener("change", cap);
   }
@@ -713,6 +743,41 @@
     main().innerHTML = `<h1>Không tìm thấy ${esc(loai)} “${esc(id)}”</h1><p>Trang này chưa có hoặc đã đổi tên. Thử ô tìm kiếm phía trên, hoặc <a href="#/">về trang chủ</a>.</p>`;
   }
 
+  /* ---------- Mục lục sáng theo khi cuộn ---------- */
+  let theoDoi = null;
+  function ganTheoDoiMucLuc() {
+    if (theoDoi) window.removeEventListener("scroll", theoDoi);
+    theoDoi = null;
+    const tocs = [...document.querySelectorAll("nav.toc")];
+    if (!tocs.length) return;
+    let cho = false;
+    const capNhat = () => {
+      cho = false;
+      tocs.forEach((toc) => {
+        if (!toc.offsetParent) return;                       // mục lục ở tab đang ẩn
+        const links = [...toc.querySelectorAll("a[data-to]")];
+        const vach = toc.getBoundingClientRect().bottom + 24;   // ngay dưới thanh mục lục
+        let dang = null;
+        links.forEach((a) => { const h = document.getElementById(a.dataset.to); if (h && h.getBoundingClientRect().top <= vach) dang = a; });
+        if (!dang && links.length) dang = null;
+        links.forEach((a) => a.classList.toggle("on", a === dang));
+        if (dang) { const l = dang.offsetLeft - 24; if (l < toc.scrollLeft || dang.offsetLeft + dang.offsetWidth > toc.scrollLeft + toc.clientWidth) toc.scrollTo({ left: Math.max(0, l), behavior: "smooth" }); }
+      });
+    };
+    theoDoi = () => { if (!cho) { cho = true; requestAnimationFrame(capNhat); } };
+    window.addEventListener("scroll", theoDoi, { passive: true });
+    capNhat();
+  }
+  // bấm số trích dẫn -> cuộn tới dòng nguồn ở cuối trang (không đổi địa chỉ trang)
+  function ganTrichDan() {
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-ref]"); if (!a) return;
+      e.preventDefault();
+      const li = document.getElementById("ref-" + a.dataset.ref);
+      if (li) { li.scrollIntoView({ behavior: "smooth", block: "center" }); li.classList.remove("nhay"); void li.offsetWidth; li.classList.add("nhay"); }
+    });
+  }
+
   /* ---------- Điều hướng ---------- */
   function dieuHuong() {
     const h = (location.hash || "#/").replace(/^#/, "");
@@ -735,7 +800,8 @@
     };
     // thay main để bỏ các bộ lắng nghe sự kiện cũ
     const cu = $("#main"), moi = cu.cloneNode(false); cu.replaceWith(moi);
-    try { (r[p[0] || ""] || (() => khongThay("trang", p[0])))(); }
+    datLaiNguon();
+    try { (r[p[0] || ""] || (() => khongThay("trang", p[0])))(); capNhatNguon(); ganTheoDoiMucLuc(); }
     catch (e) { console.error(e); main().innerHTML = `<h1>Lỗi hiển thị</h1><p>${esc(e.message)}</p><p class="muted">Có thể một file nội dung bị sai cú pháp. Mở Console (F12) để xem chi tiết.</p>`; }
     if (!location.hash.includes("#", 1)) window.scrollTo(0, 0);
   }
@@ -765,7 +831,7 @@
 
   /* ---------- Tải các file nội dung theo danh mục ---------- */
   CMR.khoiDong = function () {
-    ganGiaoDien();
+    ganGiaoDien(); ganTrichDan();
     const ds = window.DANH_MUC || [];
     // Tải song song mọi file cùng lúc (nhanh hơn nhiều khi chạy trên mạng);
     // async = false giữ đúng thứ tự chạy như trong danh mục.

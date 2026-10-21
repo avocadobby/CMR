@@ -437,3 +437,19 @@ table.plain th { color: var(--ink-2); font-weight: 600; }
 .split .scan-row { flex-wrap: wrap; row-gap: 20px; }
 .split .blk { flex: 1 1 64px; }
 @media (max-width: 640px) { .cmpt .lab { width: 92px; } .cmpt { min-width: 560px; } }
+
+/* ===== Trích dẫn đánh số + danh sách nguồn cuối trang ===== */
+sup.cite { font-size: .68em; line-height: 0; margin-left: 1px; white-space: nowrap; }
+sup.cite a { color: var(--link); text-decoration: none; font-weight: 600; padding: 0 1px; }
+sup.cite a:hover { text-decoration: underline; }
+h2 sup.cite, h3 sup.cite { font-size: .55em; }
+.refs { border-top: 1px solid var(--line); padding-top: 6px; }
+.refs:empty { display: none; }
+.reflist { font-size: .86rem; color: var(--ink-2); padding-left: 2.2em; margin: 0 0 10px; }
+.reflist li { margin: 2px 0; scroll-margin: 80px; border-radius: 4px; }
+.reflist .rma { font-weight: 700; text-decoration: none; }
+.reflist li.nhay { animation: nhay 1.6s ease-out; }
+@keyframes nhay { from { background: var(--mark); } to { background: transparent; } }
+
+/* mục lục: mục đang đọc được tô sáng */
+.toc a.on { background: var(--brand); border-color: var(--brand); color: #fff; }

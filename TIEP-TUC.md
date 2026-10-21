@@ -36,6 +36,8 @@ File ghi chú gốc nằm trong thư mục nhưng **không đưa vào Git**, nê
 - [ ] Chỉ cần ghi **protocol chuẩn** cộng thêm **các xung cần thiết** cho từng bệnh.
 - [ ] Mỗi xung thêm phải ghi rõ **hướng chụp** (mặt cắt), **trường chụp** (vùng phủ)…
 - [ ] Ghi **lý do chụp thêm xung**, tức là xung đó để đánh giá thêm điều gì.
+- [x] Cuộn tới mục nào thì **mục lục sáng theo** mục đó (thêm ngày 21/10).
+- [x] Trích dẫn trong bài chỉ **đánh số** [1], [2]…, danh sách nguồn đầy đủ dồn xuống cuối trang; cách ghi (S1, tr. …) hiện nay dài quá (thêm ngày 21/10).
 
 **Công cụ**
 - [ ] Tra ngược từ dấu hiệu: chưa đủ "thông minh", cần cải tiến.
@@ -44,7 +46,7 @@ File ghi chú gốc nằm trong thư mục nhưng **không đưa vào Git**, nê
 - [x] Máy tính: chọn phép tính nào thì chỉ hiện phép tính đó, không hiện tất cả.
 - [ ] Giá trị bình thường: thêm ô **nhập thông tin bệnh nhân** (tuổi, giới, chiều cao, cân nặng…) để web tính ra **ngưỡng bình thường** tương ứng.
 
-Ghi chú 21/10/2026: menu và trang chủ đã theo luồng Trước chụp → Đọc phim; trang bệnh chia 2 tab (Trước chụp / Đọc phim); danh mục bệnh và protocol mỗi mục một dòng; so sánh dạng bảng cùng hàng, xung chung làm mờ; máy tính hiện từng phép. Mục "sau chụp" [~] mới làm phần bố cục (tab Đọc phim); **chưa** viết thêm nội dung "cần tìm đặc điểm gì / dấu hiệu phân biệt" cho từng bệnh. Người dùng chưa xem bản giao diện mới; hỏi họ góp ý trước khi sửa tiếp.
+Ghi chú 21/10/2026: menu và trang chủ đã theo luồng Protocol (trước chụp) → Đọc phim; trang bệnh chia 2 tab (Protocol / Đọc phim); danh mục bệnh nằm trong khối 2 Đọc phim ở trang chủ (không còn bảng bệnh ở trang chủ); danh mục bệnh và protocol mỗi mục một dòng; so sánh dạng bảng cùng hàng, xung chung làm mờ; máy tính hiện từng phép. Mục "sau chụp" [~] mới làm phần bố cục (tab Đọc phim); **chưa** viết thêm nội dung "cần tìm đặc điểm gì / dấu hiệu phân biệt" cho từng bệnh. Người dùng chưa xem bản giao diện mới; hỏi họ góp ý trước khi sửa tiếp.
 
 Gợi ý thứ tự làm: so sánh bệnh và máy tính (nhỏ, dễ thấy kết quả) → protocol → luồng trước/sau chụp (thay đổi lớn, nên hỏi lại người dùng bố cục trước khi làm).
 

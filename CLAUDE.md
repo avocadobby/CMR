@@ -43,7 +43,7 @@ cong-cu-noi-bo/lay-hinh.py trích hình từ 2 quyển sách (cần Python + PyM
 | G1 | SCMR standardized protocols 2020 (không có file, kiến thức chung) | — |
 | G2 | Lake Louise Criteria 2018 (không có file, kiến thức chung) | — |
 
-- Ghi nguồn trong bài dạng `(S1, tr. 65)` hoặc `(S2, tr. 290–308)`; **tr. là số trang in trong sách**. Web tự biến các cụm này thành chữ nhỏ có liên kết tới trang Tài liệu nguồn.
+- Ghi nguồn trong bài dạng `(S1, tr. 65)` hoặc `(S2, tr. 290–308)`; **tr. là số trang in trong sách**. Khi hiển thị, web tự đổi mỗi cụm thành **số trích dẫn nhỏ** (¹, ²…) và dồn danh sách đầy đủ xuống mục *Tài liệu tham khảo* cuối trang (cùng nguồn + trang dùng lại cùng số; nhiều nguồn cách nhau bằng dấu `;`). Vẫn **viết nguồn đầy đủ trong file** như trên, không tự đánh số tay. Tên ngắn hiện trong danh sách lấy từ trường `tenNgan` trong `noi-dung/tai-lieu.js`.
 - Thêm tài liệu mới: thêm dòng vào `noi-dung/tai-lieu.js` với mã mới (B1, B2… cho bài báo; G3… cho hướng dẫn), để file PDF trong thư mục gốc hoặc `tai-lieu/`.
 - Khi các nguồn khác nhau (ví dụ sách cũ và hướng dẫn mới): ghi cả hai kèm năm, nói rõ nguồn nào mới hơn.
 - Không bịa số liệu. Thông tin không có trong sách thì ghi nguồn G/B tương ứng hoặc nói rõ “kiến thức chung, cần đối chiếu”.
@@ -95,7 +95,7 @@ CMR.benh({
 
 Mục “Hình ảnh minh họa” và “Tài liệu tham khảo” do web tự tạo từ `hinh` và `nguon`. Mục nào sách không có thì bỏ, không viết cho đủ.
 
-**Trang bệnh chia 2 tab** (tự động, không cần khai báo): các mục bắt đầu bằng *Tổng quan*, *Đặc điểm lâm sàng*, *Chỉ định*, *Protocol* nằm ở tab **1 · Trước chụp**; mọi mục còn lại (Hình ảnh MRI, Tiêu chuẩn, Phân biệt, Tiên lượng, Bẫy, Mẫu kết luận, Hình minh họa) nằm ở tab **2 · Đọc phim**. Vì vậy giữ đúng tên mục như trên. Khi in, cả 2 tab đều được in.
+**Trang bệnh chia 2 tab** (tự động, không cần khai báo): các mục bắt đầu bằng *Tổng quan*, *Đặc điểm lâm sàng*, *Chỉ định*, *Protocol* nằm ở tab **1 · Protocol**; mọi mục còn lại (Hình ảnh MRI, Tiêu chuẩn, Phân biệt, Tiên lượng, Bẫy, Mẫu kết luận, Hình minh họa) nằm ở tab **2 · Đọc phim**. Vì vậy giữ đúng tên mục như trên. Khi in, cả 2 tab đều được in.
 
 ### Quy tắc Markdown trong `noiDung`
 - Đặt trong dấu backtick `` ` `` → **không dùng dấu backtick bên trong nội dung**; không viết `${`.
@@ -110,11 +110,12 @@ Hình thái: `day-that-trai`, `gian-that-trai`, `giam-ef`, `rlvd-vung`, `phinh-m
 Muốn thêm mã mới: thêm vào mảng `DAU_HIEU` đầu file `assets/app.js`.
 
 ## Giao diện (sau lần sắp xếp lại 21/10/2026)
-- Menu thanh bên trái theo luồng làm việc: **1 Trước chụp** (Chọn protocol theo chỉ định, Danh sách protocol) → **2 Đọc phim** (Danh mục bệnh, Tra ngược, So sánh) → **Tham khảo** (Giá trị bình thường, Kiểu LGE, Máy tính, Chuỗi xung…). Trên điện thoại menu thu vào nút ☰.
+- Menu thanh bên trái theo luồng làm việc: **1 Protocol** (Chọn protocol theo chỉ định, Danh sách protocol) → **2 Đọc phim** (Danh mục bệnh, Tra ngược, So sánh) → **Tham khảo** (Giá trị bình thường, Kiểu LGE, Máy tính, Chuỗi xung…). Trên điện thoại menu thu vào nút ☰.
+- Trang chủ chỉ có 3 khối: 1 Protocol · 2 Đọc phim (gồm lối vào Danh mục bệnh) · Tham khảo nhanh — không đặt bảng bệnh ở trang chủ (người dùng yêu cầu).
 - Danh mục bệnh và danh sách protocol hiển thị **mỗi mục một dòng** (người dùng yêu cầu), có ô lọc nhanh và chip lọc theo nhóm.
 - So sánh bệnh là **bảng: cùng mục cùng hàng**; ở hàng Protocol các xung chung được làm mờ, dòng "Khác:" liệt kê xung riêng.
 - Máy tính: chọn phép tính ở cột trái, chỉ hiện phép tính đang chọn.
-- Mục lục trong bài là **thanh ngang** dính trên đầu khi cuộn (tự tạo từ các tiêu đề `## `).
+- Mục lục trong bài là **thanh ngang** dính trên đầu khi cuộn (tự tạo từ các tiêu đề `## `); mục đang đọc được tô sáng theo vị trí cuộn.
 
 ## Protocol và chuỗi xung
 - Protocol `noi-dung/protocol/P<n>.js`: `ma`, `ten`, `chiDinhNgan`, `thoiGian`, `tuKhoa`, `buoc`, `noiDung`.

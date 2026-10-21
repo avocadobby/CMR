@@ -3,8 +3,8 @@
 ## 1. Mở web
 - Bấm đúp file `index.html` → web mở trên trình duyệt (Chrome, Edge). Không cần cài gì, không cần mạng.
 - Gõ phím `/` để tìm nhanh (gõ không dấu cũng được: “viem co tim”, “HCM”, “lake louise”).
-- Menu bên trái theo thứ tự công việc: **1 Trước chụp** (chọn protocol) → **2 Đọc phim** (danh mục bệnh, tra ngược, so sánh) → **Tham khảo**. Trên điện thoại bấm nút ☰ để mở menu.
-- Mỗi trang bệnh có 2 tab: **Trước chụp** (lâm sàng, chỉ định, thứ tự chụp) và **Đọc phim** (dấu hiệu, tiêu chuẩn, phân biệt, mẫu kết luận).
+- Menu bên trái theo thứ tự công việc: **1 Protocol** (chọn protocol) → **2 Đọc phim** (danh mục bệnh, tra ngược, so sánh) → **Tham khảo**. Trên điện thoại bấm nút ☰ để mở menu.
+- Mỗi trang bệnh có 2 tab: **Protocol** (lâm sàng, chỉ định, thứ tự chụp) và **Đọc phim** (dấu hiệu, tiêu chuẩn, phân biệt, mẫu kết luận).
 - Nút *Sáng / tối* ở cuối menu: đổi giao diện sáng/tối (phòng đọc phim).
 - Mỗi trang bệnh và protocol có nút **In / lưu PDF**.
 
